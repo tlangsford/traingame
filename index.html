@@ -267,7 +267,6 @@
             'negate': { id: 'negate', type: 'prefix', prec: 4, calc: (a) => -a, fmt: (str) => `-${str}` },
             'sqrt': { id: 'sqrt', type: 'prefix', prec: 4, calc: (a) => (a < 0 ? null : Math.sqrt(a)), fmt: (str) => `\\sqrt{${str}}` },
             'factorial': { id: 'factorial', type: 'postfix', prec: 5, calc: (a) => getFactorial(a), fmt: (str) => `${str}!` },
-            'decimal': { id: 'decimal', type: 'prefix', prec: 5, calc: (a) => a / 10, fmt: (str) => `.${str}` }, 
             'percent': { id: 'percent', type: 'postfix', prec: 5, calc: (a) => a / 100, fmt: (str) => `${str}\\%` }
         };
 
@@ -280,8 +279,8 @@
             { id: 5, name: "Powers", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate'] },
             { id: 6, name: "Square Root", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt'] },
             { id: 7, name: "Factorials", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial'] },
-            { id: 8, name: "Decimal Places", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial', 'decimal'] },
-            { id: 9, name: "Percentages", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial', 'decimal', 'percent'] }
+            { id: 8, name: "Decimal Places", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial'] },
+            { id: 9, name: "Percentages", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial', 'percent'] }
         ];
 
         function getPartitions(str) {

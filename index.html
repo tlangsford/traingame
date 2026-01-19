@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Game Solver</title>
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #111;
+            font-family: serif;
+            color: #fff;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            color: #000;
+        }
+
+        h1 {
+            color: #000;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-weight: 300;
+            text-align: center;
+            border-bottom: 1px solid #000;
+            padding-bottom: 15px;
+        }
+
+        /* --- GRID LAYOUT --- */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+            padding: 20px;
+            border: 1px solid #000;
+        }
+
+        .grid-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .grid-item.full-width {
+            grid-column: span 2;
+        }
+
+        label {
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            color: #444;
+        }
+
+        /* --- INPUTS & BUTTONS --- */
+        input[type="text"],
+        input[type="number"] {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #000;
+            background-color: #fff;
+            font-family: serif;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #000;
+            color: #fff;
+            font-family: serif;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #000;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #fff;
+            color: #000;
+        }
+
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            border-color: #555;
+        }
+
+        #testNumberBtn {
+            background-color: #fabed4;
+            color: #000;
+            border-color: #000;
+        }
+
+        #testNumberBtn:hover {
+            background-color: #fff;
+        }
+
+        /* --- RESULTS --- */
+        #resultsContainer {
+            margin-top: 20px;
+        }
+
+        .result-item {
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #000;
+            border-left: 6px solid #fabed4;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result-header {
+            font-weight: 400;
+            margin-bottom: 10px;
+            color: #555;
+            text-align: center;
+        }
+
+        .loading {
+            color: #555;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .note {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        /* --- PROGRESS BAR --- */
+        #progressWrapper {
+            display: none;
+            grid-column: span 2;
+            margin-top: 10px;
+        }
+
+        #progressBar {
+            width: 100%;
+            background-color: #eee;
+            border: 1px solid #000;
+            height: 20px;
+            position: relative;
+        }
+
+        #progressFill {
+            height: 100%;
+            background-color: #fabed4;
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        #progressText {
+            text-align: center;
+            font-size: 12px;
+            margin-top: 5px;
+            color: #000;
+        }
+
+        .stages-legend {
+            color: #888; 
+            text-align: center; 
+            padding: 15px; 
+            margin-top: 10px; 
+            font-size: 0.85em; 
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Train Game Solver</h1>
+
+        <div class="controls-grid">
+            <div class="grid-item full-width">
+                <label for="targetInput">Target Number (0–100)</label>
+                <input type="number" id="targetInput" value="10" min="0" max="100">
+            </div>
+
+            <div class="grid-item">
+                <label for="testNumberInput">My Compartment Number</label>
+                <input type="text" id="testNumberInput" placeholder="e.g. 0458" maxlength="4">
+            </div>
+            <div class="grid-item">
+                <label>&nbsp;</label> <button id="testNumberBtn">Solve My Compartment</button>
+            </div>
+
+            <div class="grid-item">
+                <button id="catchTrainBtn">Random Compartment</button>
+            </div>
+            <div class="grid-item">
+                <button id="solveAllBtn">Download 0000–9999</button>
+            </div>
+
+            <div id="progressWrapper">
+                <div id="progressBar">
+                    <div id="progressFill"></div>
+                </div>
+                <div id="progressText">Processing...</div>
+            </div>
+        </div>
+
+        <div id="resultsContainer">
+            </div>
+
+        <div class="stages-legend">
+            + – × ÷ ^ √ ! . %
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION & OPERATORS ---
+
+        const memoFactorial = { 0: 1, 1: 1, 2: 2, 3: 6, 4: 24, 5: 120, 6: 720, 7: 5040, 8: 40320 };
+        function getFactorial(n) {
+            if (n < 0 || n > 12 || !Number.isInteger(n)) return null;
+            if (memoFactorial[n]) return memoFactorial[n];
+            let result = 1;
+            for (let i = 2; i <= n; i++) result *= i;
+            return result;
+        }
+
+        const ALL_BINARY_OPS = {
+            'add': { id: 'add', latex: '+', prec: 1, calc: (a, b) => a + b },
+            'sub': { id: 'sub', latex: '-', prec: 1, calc: (a, b) => a - b },
+            'mul': { id: 'mul', latex: '\\times', prec: 2, calc: (a, b) => a * b },
+            'div': { id: 'div', latex: '\\div', prec: 2, calc: (a, b) => Math.abs(b) < 1e-9 ? null : a / b },
+            'pow': {
+                id: 'pow', latex: '^', prec: 3,
+                calc: (a, b) => {
+                    if (Math.abs(b) > 20) return null;
+                    if (a === 0 && b <= 0) return null;
+                    const res = Math.pow(a, b);
+                    return (Math.abs(res) > 1e15 || isNaN(res)) ? null : res;
+                }
+            }
+        };
+
+        const ALL_UNARY_OPS = {
+            'negate': { id: 'negate', type: 'prefix', prec: 4, calc: (a) => -a, fmt: (str) => `-${str}` },
+            'sqrt': { id: 'sqrt', type: 'prefix', prec: 4, calc: (a) => (a < 0 ? null : Math.sqrt(a)), fmt: (str) => `\\sqrt{${str}}` },
+            'factorial': { id: 'factorial', type: 'postfix', prec: 5, calc: (a) => getFactorial(a), fmt: (str) => `${str}!` },
+            'decimal': { id: 'decimal', type: 'prefix', prec: 5, calc: (a) => a / 10, fmt: (str) => `.${str}` }, 
+            'percent': { id: 'percent', type: 'postfix', prec: 5, calc: (a) => a / 100, fmt: (str) => `${str}\\%` }
+        };
+
+        const STAGES = [
+            { id: 0, name: "Concatenation", bins: [], uns: [] }, 
+            { id: 1, name: "Addition", bins: ['add'], uns: [] },
+            { id: 2, name: "Subtraction", bins: ['add', 'sub'], uns: ['negate'] },
+            { id: 3, name: "Multiplication", bins: ['add', 'sub', 'mul'], uns: ['negate'] },
+            { id: 4, name: "Division", bins: ['add', 'sub', 'mul', 'div'], uns: ['negate'] },
+            { id: 5, name: "Powers", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate'] },
+            { id: 6, name: "Square Root", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt'] },
+            { id: 7, name: "Factorials", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial'] },
+            { id: 8, name: "Decimal Places", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial', 'decimal'] },
+            { id: 9, name: "Percentages", bins: ['add', 'sub', 'mul', 'div', 'pow'], uns: ['negate', 'sqrt', 'factorial', 'decimal', 'percent'] }
+        ];
+
+        function getPartitions(str) {
+            if (str.length === 0) return [[]];
+            let parts = [];
+            for (let i = 1; i <= str.length; i++) {
+                let head = str.slice(0, i);
+                let tails = getPartitions(str.slice(i));
+                tails.forEach(t => parts.push([head, ...t]));
+            }
+            return parts;
+        }
+
+        function getDecimalVariants(str, allowDecimal) {
+            let variants = [];
+
+            const baseVal = parseFloat(str);
+            variants.push({ value: baseVal, latex: str, prec: 10, complexity: 0, lastOp: null });
+
+            if (!allowDecimal) return variants;
+
+            for (let i = 0; i < str.length; i++) {
+                let s = str.slice(0, i) + "." + str.slice(i);
+                let val = parseFloat(s);
+
+                if (val !== baseVal) {
+                    variants.push({ value: val, latex: s, prec: 10, complexity: 1, lastOp: null });
+                }
+            }
+            return variants;
+        }
+
+        function getPartitionPermutations(partition, allowDecimal) {
+            const variantLists = partition.map(p => getDecimalVariants(p, allowDecimal));
+
+            const cartesian = (arrays) => {
+                return arrays.reduce((acc, curr) => {
+                    return acc.flatMap(a => curr.map(c => [...a, c]));
+                }, [[]]);
+            };
+
+            return cartesian(variantLists);
+        }
+
+        function generateExpressions(nodes, binOpIds, unOpIds) {
+            let results = [];
+
+            if (nodes.length === 1) {
+                results.push(nodes[0]);
+            } else {
+                for (let i = 1; i < nodes.length; i++) {
+                    const leftPart = nodes.slice(0, i);
+                    const rightPart = nodes.slice(i);
+
+                    const leftSols = generateExpressions(leftPart, binOpIds, unOpIds);
+                    const rightSols = generateExpressions(rightPart, binOpIds, unOpIds);
+
+                    leftSols.forEach(l => {
+                        rightSols.forEach(r => {
+                            binOpIds.forEach(opKey => {
+                                const op = ALL_BINARY_OPS[opKey];
+
+                                if (r.lastOp === 'negate') {
+                                    if (op.id === 'add') return;
+                                    if (op.id === 'sub') return;
+                                }
+
+                                const val = op.calc(l.value, r.value);
+                                if (val !== null && Number.isFinite(val)) {
+                                    let lStr = l.latex;
+                                    let rStr = r.latex;
+
+                                    if (l.prec < op.prec) lStr = `(${lStr})`;
+                                    if (r.prec < op.prec || (r.prec === op.prec && ['sub', 'div', 'pow'].includes(op.id))) {
+                                        rStr = `(${rStr})`;
+                                    }
+
+                                    let finalLatex = (op.id === 'pow')
+                                        ? `{${lStr}}^{${rStr}}`
+                                        : `${lStr}${op.latex}${rStr}`;
+
+                                    results.push({
+                                        value: val,
+                                        latex: finalLatex,
+                                        prec: op.prec,
+                                        complexity: l.complexity + r.complexity + 1,
+                                        lastOp: op.id
+                                    });
+                                }
+                            });
+                        });
+                    });
+                }
+            }
+
+            const unaryResults = [];
+            results.forEach(item => {
+                if (item.complexity < 6) {
+                    unOpIds.forEach(opKey => {
+                        const op = ALL_UNARY_OPS[opKey];
+                        if (op.id === 'decimal' && item.complexity > 0) return;
+                        if (op.id === 'negate' && item.lastOp === 'negate') return;
+
+                        const val = op.calc(item.value);
+                        if (val !== null && Number.isFinite(val)) {
+                            let str = item.latex;
+                            if (item.prec < op.prec) str = `(${str})`;
+
+                            unaryResults.push({
+                                value: val,
+                                latex: op.fmt(str),
+                                prec: op.prec,
+                                complexity: item.complexity + 1,
+                                lastOp: op.id
+                            });
+                        }
+                    });
+                }
+            });
+
+            return [...results, ...unaryResults];
+        }
+
+        // --- MASTER SOLVER ---
+
+        function solveStaged(numberStr, target) {
+            const rawPartitions = getPartitions(numberStr);
+            const EPSILON = 1e-14;
+
+            for (const stage of STAGES) {
+                let stageSolutions = [];
+
+                if (stage.id === 0) {
+                    const variants = getDecimalVariants(numberStr, false); 
+                    for (let v of variants) {
+                        if (Math.abs(v.value - target) < EPSILON) {
+                            stageSolutions.push(v);
+                        }
+                    }
+                }
+                else {
+                    const allowInternalDecimals = (stage.id >= 8);
+
+                    for (const partition of rawPartitions) {
+                        if (partition.length < 2 && stage.id < 7) continue; 
+
+                        const inputSets = getPartitionPermutations(partition, allowInternalDecimals);
+
+                        for (const inputs of inputSets) {
+                            const exprs = generateExpressions(inputs, stage.bins, stage.uns);
+                            const matches = exprs.filter(e => Math.abs(e.value - target) < EPSILON);
+                            stageSolutions.push(...matches);
+                        }
+                    }
+                }
+
+                if (stageSolutions.length > 0) {
+                    stageSolutions.sort((a, b) => {
+                        const lenDiff = a.latex.length - b.latex.length;
+                        if (lenDiff !== 0) return lenDiff;
+                        return a.complexity - b.complexity;
+                    });
+                    const seen = new Set();
+                    const unique = [];
+                    for (const s of stageSolutions) {
+                        if (!seen.has(s.latex)) {
+                            seen.add(s.latex);
+                            unique.push(s);
+                        }
+                    }
+
+                    return { stage: stage.name, solutions: unique };
+                }
+            }
+            return { stage: null, solutions: [] };
+        }
+
+        // --- UI HANDLERS ---
+
+        const resultsContainer = document.getElementById('resultsContainer');
+        const testBtn = document.getElementById('testNumberBtn');
+        const solveAllBtn = document.getElementById('solveAllBtn');
+        const testInput = document.getElementById('testNumberInput');
+        const targetInput = document.getElementById('targetInput'); 
+        const randomBtn = document.getElementById('catchTrainBtn');
+        const progressWrapper = document.getElementById('progressWrapper');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+
+        function getTarget() {
+            // 0-100
+            let val = parseInt(targetInput.value);
+            if(isNaN(val)) val = 10;
+            if(val < 0) val = 0;
+            if(val > 100) val = 100;
+            return val;
+        }
+
+        function renderMath() {
+            if (window.MathJax) window.MathJax.typesetPromise([resultsContainer]);
+        }
+
+        function runSolver(inputVal) {
+            const target = getTarget();
+
+            resultsContainer.innerHTML = `<div class="loading">Solving ${inputVal} for target ${target}...</div>`;
+
+            setTimeout(() => {
+                const start = performance.now();
+                const result = solveStaged(inputVal, target);
+                const time = (performance.now() - start).toFixed(0);
+
+                let html = "";
+                if (result.solutions.length === 0) {
+                    html = `<div class="result-header">Results for ${inputVal} = ${target}\n</div>
+                            <div style="padding:20px; text-align:center; color:#d32f2f;">No solution found.</div>`;
+                } else {
+                    html = `<div class="result-header">
+                                Results for ${inputVal} &rarr; ${target}<br>
+                                <span style="font-weight:normal; font-size:0.9em">
+                                    (Solved with ${result.stage} in ${time} milliseconds.)
+                                </span>
+                            </div>`;
+
+                    // Only show first solution
+                    result.solutions.slice(0, 1).forEach(sol => {
+                        html += `<div class="result-item">
+                                    <span>$ ${sol.latex} = ${target} $</span>
+                                 </div>`;
+                    });
+                }
+
+                resultsContainer.innerHTML = html;
+                renderMath();
+            }, 50);
+        }
+
+        solveAllBtn.addEventListener('click', async () => {
+            const target = getTarget();
+            if (!confirm(`This will download all possible solutions for 0000–9999 for target ${target}. This may take a while.`)) return;
+
+            solveAllBtn.disabled = true;
+            progressWrapper.style.display = 'block';
+            resultsContainer.innerHTML = '';
+
+            let outputText = `Train Game Solutions (Target: ${target})\n\n`;
+            let current = 0;
+            const end = 9999;
+            const BATCH_SIZE = 20;
+
+            function processBatch() {
+                const batchEnd = Math.min(current + BATCH_SIZE, end + 1);
+
+                for (let i = current; i < batchEnd; i++) {
+                    const numStr = i.toString().padStart(4, '0');
+                    const result = solveStaged(numStr, target);
+
+                    let line = "";
+                    if (result.solutions.length > 0) {
+                        line = `${numStr}: \$${result.solutions[0].latex} = ${target}\$`;
+                    } else {
+                        line = `${numStr}: [No Solution]`;
+                    }
+
+                    outputText += line + "\n";
+                }
+
+                current = batchEnd;
+
+                const pct = Math.floor((current / (end + 1)) * 100);
+                progressFill.style.width = `${pct}%`;
+                progressText.innerText = `Solving ${current} / 10000...`;
+
+                if (current <= end) {
+                    setTimeout(processBatch, 0);
+                } else {
+                    downloadFile(`Train Game Solutions ${target}.txt`, outputText);
+                    solveAllBtn.disabled = false;
+                    progressText.innerText = "Done! Downloading file...";
+                    setTimeout(() => { progressWrapper.style.display = 'none'; }, 3000);
+                }
+            }
+
+            processBatch();
+        });
+
+        function downloadFile(filename, content) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        testBtn.addEventListener('click', () => {
+            const val = testInput.value;
+            if (!/^\d{4}$/.test(val)) return alert("Please enter exactly 4 digits");
+            runSolver(val);
+        });
+
+        randomBtn.addEventListener('click', () => {
+            const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+            testInput.value = random;
+            runSolver(random);
+        });
+
+        testInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') testBtn.click(); });
+        testInput.addEventListener('input', function () { this.value = this.value.replace(/[^0-9]/g, ''); });
+
+    </script>
+</body>
+
+</html>
